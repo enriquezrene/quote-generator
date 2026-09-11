@@ -216,7 +216,7 @@ function renderFrame() {
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 7;
   ctx.fillStyle = '#ffffff';
-  drawBoldScriptLogo(ctx, 'DiaUno', frame.width / 2, 230);
+  drawBoldScriptLogo(ctx, 'DiaUno', frame.width / 2, 380);
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
