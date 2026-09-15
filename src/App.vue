@@ -11,6 +11,13 @@ const frame = {
   height: 1920,
 };
 
+const TIKTOK_SAFE_ZONE = {
+  contentLeftMargin: 120,
+  rightIconColumnWidth: 160,
+  rightIconColumnMargin: 24,
+  bottomCaptionHeight: 320,
+};
+
 const colorChoices = [
   { label: 'White', value: '#ffffff' },
   { label: 'Black', value: '#111111' },
@@ -48,6 +55,7 @@ const state = reactive({
   autoFit: true,
   selectedPreset: 'default-blue',
   photo: null,
+  showTiktokGuide: true,
 });
 
 const quoteFont = computed(() => {
@@ -141,8 +149,8 @@ function drawCoverImage(ctx, image, x, y, width, height) {
   ctx.drawImage(image, dx, dy, scaledWidth, scaledHeight);
 }
 
-function wrapText(ctx, text, maxWidth) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
+function wrapTextLine(ctx, text, maxWidth) {
+  const words = text.trim().split(/[^\S\r\n]+/).filter(Boolean);
   const lines = [];
   let line = '';
 
@@ -160,6 +168,15 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
+function wrapText(ctx, text, maxWidth) {
+  const paragraphs = text.split(/\r?\n/);
+
+  return paragraphs.flatMap((paragraph) => {
+    if (!paragraph.trim()) return [''];
+    return wrapTextLine(ctx, paragraph, maxWidth);
+  });
+}
+
 function fitQuote(ctx, quote, maxWidth, maxHeight) {
   const requestedSize = Number(state.fontSize);
   let size = state.autoFit ? requestedSize : Math.max(34, requestedSize);
@@ -167,7 +184,7 @@ function fitQuote(ctx, quote, maxWidth, maxHeight) {
   let lineHeight = size * 1.22;
 
   while (size >= 34) {
-    ctx.font = `400 ${size}px ${quoteFont.value}`;
+    ctx.font = `600 ${size}px ${quoteFont.value}`;
     lines = wrapText(ctx, quote, maxWidth);
     lineHeight = size * 1.22;
     if (!state.autoFit || lines.length * lineHeight <= maxHeight) break;
@@ -195,6 +212,16 @@ function drawBoldScriptLogo(ctx, text, x, y) {
   offsets.forEach(([dx, dy]) => {
     ctx.fillText(text, x + dx, y + dy);
   });
+}
+
+function getSafeContentBox() {
+  const safeLeft = TIKTOK_SAFE_ZONE.contentLeftMargin;
+  const safeRight =
+    frame.width - (TIKTOK_SAFE_ZONE.rightIconColumnWidth + TIKTOK_SAFE_ZONE.rightIconColumnMargin);
+  return {
+    safeWidth: safeRight - safeLeft,
+    safeCenterX: (safeLeft + safeRight) / 2,
+  };
 }
 
 function renderFrame() {
@@ -225,7 +252,8 @@ function renderFrame() {
   const quote = state.quote.trim()
     ? `"${state.quote.trim().replace(/^["“”]+|["“”]+$/g, '')}"`
     : '"Your quote goes here."';
-  const maxWidth = 840;
+  const { safeWidth, safeCenterX } = getSafeContentBox();
+  const maxWidth = safeWidth;
   const maxHeight = 900;
   const fitted = fitQuote(ctx, quote, maxWidth, maxHeight);
   const quoteBlockHeight = fitted.lines.length * fitted.lineHeight;
@@ -233,15 +261,15 @@ function renderFrame() {
   const totalHeight = quoteBlockHeight + authorGap;
   const startY = frame.height / 2 - totalHeight / 2 + fitted.lineHeight / 2 + 58;
 
-  ctx.font = `400 ${fitted.size}px ${quoteFont.value}`;
+  ctx.font = `600 ${fitted.size}px ${quoteFont.value}`;
   ctx.fillStyle = state.quoteColor;
-  drawCenteredText(ctx, fitted.lines, frame.width / 2, startY, fitted.lineHeight);
+  drawCenteredText(ctx, fitted.lines, safeCenterX, startY, fitted.lineHeight);
 
   if (state.author.trim()) {
-    ctx.font = `400 ${Math.max(32, Math.round(fitted.size * 0.48))}px ${quoteFont.value}`;
+    ctx.font = `600 ${Math.max(32, Math.round(fitted.size * 0.48))}px ${quoteFont.value}`;
     ctx.fillText(
       `- ${state.author.trim()}`,
-      frame.width / 2,
+      safeCenterX,
       startY + quoteBlockHeight + authorGap,
     );
   }
@@ -335,7 +363,41 @@ onMounted(() => {
       </div>
 
       <div class="phone-stage">
-        <canvas ref="canvasRef" aria-label="Generated DiaUno quote frame"></canvas>
+        <div class="canvas-frame">
+          <canvas ref="canvasRef" aria-label="Generated DiaUno quote frame"></canvas>
+
+          <div v-if="state.showTiktokGuide" class="tiktok-guide" aria-hidden="true">
+            <div class="tiktok-guide__safe-outline"></div>
+
+            <div class="tiktok-guide__icon-rail">
+              <div class="tiktok-guide__icon tiktok-guide__icon--avatar">🙂</div>
+              <div class="tiktok-guide__icon">
+                <span>♡</span>
+                <span class="tiktok-guide__icon-count">12.3K</span>
+              </div>
+              <div class="tiktok-guide__icon">
+                <span>💬</span>
+                <span class="tiktok-guide__icon-count">248</span>
+              </div>
+              <div class="tiktok-guide__icon">
+                <span>🔖</span>
+                <span class="tiktok-guide__icon-count">96</span>
+              </div>
+              <div class="tiktok-guide__icon">
+                <span>↗</span>
+                <span class="tiktok-guide__icon-count">Share</span>
+              </div>
+              <div class="tiktok-guide__icon tiktok-guide__icon--disc">🎵</div>
+            </div>
+
+            <div class="tiktok-guide__caption-zone">
+              <span class="tiktok-guide__caption-line">@username</span>
+              <span class="tiktok-guide__caption-line tiktok-guide__caption-line--muted">
+                Caption text goes here #hashtag
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="share-row">
@@ -460,6 +522,14 @@ onMounted(() => {
         <label class="range-field">
           <span>{{ state.fontSize }}px</span>
           <input v-model.number="state.fontSize" min="38" max="128" step="2" type="range" />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Preview Guides</legend>
+        <label class="toggle-row">
+          <input v-model="state.showTiktokGuide" type="checkbox" />
+          <span>Show TikTok UI guide</span>
         </label>
       </fieldset>
     </aside>
