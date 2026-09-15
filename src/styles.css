@@ -104,12 +104,108 @@ h1 {
   box-shadow: 0 28px 70px rgba(27, 41, 64, 0.22);
 }
 
+.canvas-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 canvas {
   display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   border-radius: 18px;
   background: #2979e1;
+}
+
+.tiktok-guide {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  pointer-events: none;
+  color: #ffffff;
+}
+
+.tiktok-guide__safe-outline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 17%;
+  bottom: 16.6%;
+  border: 1px dashed rgba(255, 255, 255, 0.55);
+  border-radius: 14px;
+}
+
+.tiktok-guide__icon-rail {
+  position: absolute;
+  top: 55%;
+  right: 3.5%;
+  bottom: 8%;
+  width: 12.5%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4%;
+  padding: 3% 0;
+  border: 1px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.tiktok-guide__icon {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  font-size: clamp(0.9rem, 2.4vw, 1.5rem);
+  line-height: 1;
+  opacity: 0.85;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.tiktok-guide__icon-count {
+  font-size: 0.6rem;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.tiktok-guide__icon--avatar,
+.tiktok-guide__icon--disc {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+}
+
+.tiktok-guide__caption-zone {
+  position: absolute;
+  left: 4%;
+  right: 20%;
+  bottom: 3%;
+  height: 13%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.tiktok-guide__caption-line {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.tiktok-guide__caption-line--muted {
+  font-weight: 500;
+  opacity: 0.55;
 }
 
 .share-row {
@@ -357,5 +453,9 @@ input[type="range"] {
 
   .swatch-grid {
     grid-template-columns: repeat(4, 38px);
+  }
+
+  .tiktok-guide__icon-rail {
+    width: 15%;
   }
 }
