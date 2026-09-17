@@ -46,6 +46,7 @@ const state = reactive({
   quote:
     'Start where you are. Use what you have. Do what you can.',
   author: 'Arthur Ashe',
+  cta: 'Comparte esto con alguien que necesita escucharlo.',
   backgroundMode: 'default',
   solidColor: '#2979E1',
   gradientStart: '#2979E1',
@@ -200,6 +201,24 @@ function drawCenteredText(ctx, lines, x, y, lineHeight) {
   });
 }
 
+function getCtaLines(ctx, text, maxWidth) {
+  const cleanText = text.trim();
+  if (!cleanText) return [];
+
+  const fontSize = 50;
+  ctx.font = `600 ${fontSize}px ${quoteFont.value}`;
+  return wrapText(ctx, cleanText, maxWidth).slice(0, 2);
+}
+
+function drawCta(ctx, lines, x, y) {
+  if (!lines.length) return 0;
+
+  const lineHeight = 64;
+  ctx.font = `600 50px ${quoteFont.value}`;
+  drawCenteredText(ctx, lines, x, y, lineHeight);
+  return lines.length * lineHeight;
+}
+
 function drawBoldScriptLogo(ctx, text, x, y) {
   const offsets = [
     [0, 0],
@@ -221,6 +240,7 @@ function getSafeContentBox() {
   return {
     safeWidth: safeRight - safeLeft,
     safeCenterX: (safeLeft + safeRight) / 2,
+    safeRight,
   };
 }
 
@@ -252,26 +272,33 @@ function renderFrame() {
   const quote = state.quote.trim()
     ? `"${state.quote.trim().replace(/^["“”]+|["“”]+$/g, '')}"`
     : '"Your quote goes here."';
-  const { safeWidth, safeCenterX } = getSafeContentBox();
+  const { safeWidth, safeCenterX, safeRight } = getSafeContentBox();
   const maxWidth = safeWidth;
   const maxHeight = 900;
   const fitted = fitQuote(ctx, quote, maxWidth, maxHeight);
+  const ctaLines = getCtaLines(ctx, state.cta, maxWidth);
   const quoteBlockHeight = fitted.lines.length * fitted.lineHeight;
-  const authorGap = state.author.trim() ? 94 : 0;
-  const totalHeight = quoteBlockHeight + authorGap;
+  const ctaGap = ctaLines.length ? 86 : 0;
+  const ctaHeight = ctaLines.length * 64;
+  const totalHeight = quoteBlockHeight + ctaGap + ctaHeight;
   const startY = frame.height / 2 - totalHeight / 2 + fitted.lineHeight / 2 + 58;
 
   ctx.font = `600 ${fitted.size}px ${quoteFont.value}`;
   ctx.fillStyle = state.quoteColor;
   drawCenteredText(ctx, fitted.lines, safeCenterX, startY, fitted.lineHeight);
 
+  const ctaY = startY + quoteBlockHeight + ctaGap;
+  drawCta(ctx, ctaLines, safeCenterX, ctaY);
+
   if (state.author.trim()) {
-    ctx.font = `600 ${Math.max(32, Math.round(fitted.size * 0.48))}px ${quoteFont.value}`;
+    ctx.font = `600 ${Math.max(26, Math.round(fitted.size * 0.36))}px ${quoteFont.value}`;
+    ctx.textAlign = 'right';
     ctx.fillText(
-      `- ${state.author.trim()}`,
-      safeCenterX,
-      startY + quoteBlockHeight + authorGap,
+      state.author.trim(),
+      safeRight,
+      1548,
     );
+    ctx.textAlign = 'center';
   }
 }
 
@@ -417,6 +444,15 @@ onMounted(() => {
       <label class="field">
         <span>Author</span>
         <input v-model="state.author" type="text" placeholder="Optional" />
+      </label>
+
+      <label class="field">
+        <span>CTA</span>
+        <input
+          v-model="state.cta"
+          type="text"
+          placeholder="Comparte esto con alguien que necesita escucharlo."
+        />
       </label>
 
       <label class="field">
