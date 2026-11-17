@@ -43,45 +43,40 @@ const presets = [
 ];
 
 const state = reactive({
-  quote:
-    'Start where you are. Use what you have. Do what you can.',
-  author: 'Arthur Ashe',
+  quote: '',
+  photo: null,
+  brightness: 100,
+  contrast: 120,
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+  boxX: 138,
+  boxY: 685,
+  boxWidth: 600,
+  boxHeight: 270,
+  quoteAreaMode: 'white',
+  quoteAreaBrightness: 100,
+  quoteAreaOpacity: 0,
+  quoteAreaContrast: 120,
+  logoText: 'DiaUno',
+  logoSize: 90,
+  fontSize: 76,
+  autoFit: true,
+  author: '',
   backgroundMode: 'default',
   solidColor: '#2979E1',
   gradientStart: '#2979E1',
   gradientEnd: '#123D86',
   quoteColor: '#ffffff',
-  fontSize: 76,
-  autoFit: true,
   selectedPreset: 'default-blue',
-  photo: null,
-  showTiktokGuide: true,
+  showTiktokGuide: false,
 });
 
 const quoteFont = computed(() => {
   return 'Inter, Montserrat, "Avenir Next", Futura, "Century Gothic", Arial, sans-serif';
 });
 
-const diaUnoFont = computed(() => {
-  return '"Alex Brush", "Great Vibes", Allura, "Rockybilly Regular", Rockybilly, cursive';
-});
-
-const logoFont = computed(() => {
-  return `400 156px ${diaUnoFont.value}`;
-});
-
-function applyPreset(id) {
-  const preset = presets.find((item) => item.id === id);
-  if (!preset) return;
-
-  Object.assign(state, preset.settings);
-  state.selectedPreset = id;
-  if (id === 'default-blue') {
-    state.photo = null;
-    previewUrl.value = '';
-  }
-  renderFrame();
-}
+const logoFont = computed(() => `500 ${state.logoSize}px Arial, sans-serif`);
 
 function choosePhoto() {
   fileInputRef.value?.click();
@@ -97,7 +92,9 @@ function onPhotoSelected(event) {
     image.addEventListener('load', () => {
       state.photo = image;
       previewUrl.value = reader.result;
-      state.backgroundMode = 'photo';
+      state.panX = 0;
+      state.panY = 0;
+      state.zoom = 1;
       renderFrame();
     });
     image.src = reader.result;
@@ -109,44 +106,59 @@ function clearPhoto() {
   state.photo = null;
   previewUrl.value = '';
   if (fileInputRef.value) fileInputRef.value.value = '';
-  if (state.backgroundMode === 'photo') state.backgroundMode = 'default';
   renderFrame();
 }
 
 function drawBackground(ctx) {
-  if (state.backgroundMode === 'photo' && state.photo) {
-    drawCoverImage(ctx, state.photo, 0, 0, frame.width, frame.height);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
-    ctx.fillRect(0, 0, frame.width, frame.height);
-    return;
-  }
-
-  if (state.backgroundMode === 'solid') {
-    ctx.fillStyle = state.solidColor;
-    ctx.fillRect(0, 0, frame.width, frame.height);
-    return;
-  }
-
-  if (state.backgroundMode === 'gradient') {
-    const gradient = ctx.createLinearGradient(0, 0, frame.width, frame.height);
-    gradient.addColorStop(0, state.gradientStart);
-    gradient.addColorStop(1, state.gradientEnd);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, frame.width, frame.height);
-    return;
-  }
-
-  ctx.fillStyle = '#2979E1';
+  ctx.fillStyle = '#222222';
   ctx.fillRect(0, 0, frame.width, frame.height);
+  if (!state.photo) return;
+  const scale = Math.max(frame.width / state.photo.width, frame.height / state.photo.height) * state.zoom;
+  const width = state.photo.width * scale;
+  const height = state.photo.height * scale;
+  ctx.save();
+  ctx.filter = `grayscale(1) brightness(${state.brightness}%) contrast(${state.contrast}%)`;
+  ctx.drawImage(state.photo, (frame.width - width) / 2 + state.panX, (frame.height - height) / 2 + state.panY, width, height);
+  ctx.restore();
 }
 
-function drawCoverImage(ctx, image, x, y, width, height) {
-  const scale = Math.max(width / image.width, height / image.height);
-  const scaledWidth = image.width * scale;
-  const scaledHeight = image.height * scale;
-  const dx = x + (width - scaledWidth) / 2;
-  const dy = y + (height - scaledHeight) / 2;
-  ctx.drawImage(image, dx, dy, scaledWidth, scaledHeight);
+const drag = { mode: null, startX: 0, startY: 0, originX: 0, originY: 0, originWidth: 0, originHeight: 0 };
+function pointerPosition(event) {
+  const bounds = canvasRef.value.getBoundingClientRect();
+  return { x: (event.clientX - bounds.left) * frame.width / bounds.width, y: (event.clientY - bounds.top) * frame.height / bounds.height };
+}
+function onCanvasPointerDown(event) {
+  const { x, y } = pointerPosition(event);
+  const within = x >= state.boxX && x <= state.boxX + state.boxWidth && y >= state.boxY && y <= state.boxY + state.boxHeight;
+  const nearRight = x >= state.boxX + state.boxWidth - 32 && y >= state.boxY && y <= state.boxY + state.boxHeight;
+  const nearBottom = y >= state.boxY + state.boxHeight - 32 && x >= state.boxX && x <= state.boxX + state.boxWidth;
+  drag.mode = nearRight && nearBottom ? 'resize-both' : nearRight ? 'resize-x' : nearBottom ? 'resize-y' : within ? 'box' : 'photo';
+  drag.startX = x; drag.startY = y;
+  drag.originX = drag.mode === 'photo' ? state.panX : state.boxX;
+  drag.originY = drag.mode === 'photo' ? state.panY : state.boxY;
+  drag.originWidth = state.boxWidth;
+  drag.originHeight = state.boxHeight;
+  canvasRef.value.style.cursor = drag.mode === 'resize-x' ? 'ew-resize' : drag.mode === 'resize-y' ? 'ns-resize' : drag.mode === 'resize-both' ? 'nwse-resize' : 'grabbing';
+  canvasRef.value.setPointerCapture(event.pointerId);
+}
+function onCanvasPointerMove(event) {
+  if (!drag.mode) return;
+  const { x, y } = pointerPosition(event); const dx = x - drag.startX; const dy = y - drag.startY;
+  if (drag.mode === 'box') {
+    state.boxX = Math.max(0, Math.min(frame.width - state.boxWidth, drag.originX + dx));
+    state.boxY = Math.max(0, Math.min(frame.height - state.boxHeight, drag.originY + dy));
+  } else if (drag.mode === 'resize-x' || drag.mode === 'resize-both') {
+    state.boxWidth = Math.max(360, Math.min(frame.width - state.boxX, drag.originWidth + dx));
+  }
+  if (drag.mode === 'resize-y' || drag.mode === 'resize-both') {
+    state.boxHeight = Math.max(180, Math.min(frame.height - state.boxY, drag.originHeight + dy));
+  }
+  if (drag.mode === 'photo') { state.panX = drag.originX + dx; state.panY = drag.originY + dy; }
+  renderFrame();
+}
+function onCanvasPointerUp() {
+  drag.mode = null;
+  if (canvasRef.value) canvasRef.value.style.cursor = 'grab';
 }
 
 function wrapTextLine(ctx, text, maxWidth) {
@@ -201,28 +213,17 @@ function drawCenteredText(ctx, lines, x, y, lineHeight) {
 }
 
 function drawBoldScriptLogo(ctx, text, x, y) {
-  const offsets = [
-    [0, 0],
-    [-1.8, 0],
-    [1.8, 0],
-    [0, -1.2],
-    [0, 1.2],
-  ];
-
-  offsets.forEach(([dx, dy]) => {
+  [[0, 0], [-1.8, 0], [1.8, 0], [0, -1.2], [0, 1.2]].forEach(([dx, dy]) => {
     ctx.fillText(text, x + dx, y + dy);
   });
 }
 
 function getSafeContentBox() {
   const safeLeft = TIKTOK_SAFE_ZONE.contentLeftMargin;
-  const safeRight =
-    frame.width - (TIKTOK_SAFE_ZONE.rightIconColumnWidth + TIKTOK_SAFE_ZONE.rightIconColumnMargin);
-  return {
-    safeWidth: safeRight - safeLeft,
-    safeCenterX: (safeLeft + safeRight) / 2,
-  };
+  const safeRight = frame.width - (TIKTOK_SAFE_ZONE.rightIconColumnWidth + TIKTOK_SAFE_ZONE.rightIconColumnMargin);
+  return { safeWidth: safeRight - safeLeft, safeCenterX: (safeLeft + safeRight) / 2 };
 }
+
 
 function renderFrame() {
   const canvas = canvasRef.value;
@@ -237,42 +238,53 @@ function renderFrame() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  ctx.font = logoFont.value;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.38)';
-  ctx.shadowBlur = 5;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 7;
-  ctx.fillStyle = '#ffffff';
-  drawBoldScriptLogo(ctx, 'DiaUno', frame.width / 2, 380);
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
+  if (state.quoteAreaMode === 'white') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
+  } else if (state.photo) {
+    const scale = Math.max(frame.width / state.photo.width, frame.height / state.photo.height) * state.zoom;
+    const width = state.photo.width * scale;
+    const height = state.photo.height * scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
+    ctx.clip();
+    ctx.filter = `grayscale(1) brightness(${state.quoteAreaBrightness}%) contrast(${state.quoteAreaContrast}%)`;
+    ctx.drawImage(state.photo, (frame.width - width) / 2 + state.panX, (frame.height - height) / 2 + state.panY, width, height);
+    ctx.restore();
+    if (state.quoteAreaOpacity > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${state.quoteAreaOpacity / 100})`;
+      ctx.fillRect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
+    }
+  } else {
+    const level = Math.round(35 + state.quoteAreaBrightness * 0.75);
+    ctx.fillStyle = `rgb(${level}, ${level}, ${level})`;
+    ctx.fillRect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
+  }
+  ctx.strokeStyle = '#111111';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
 
   const quote = state.quote.trim()
     ? `"${state.quote.trim().replace(/^["“”]+|["“”]+$/g, '')}"`
     : '"Your quote goes here."';
-  const { safeWidth, safeCenterX } = getSafeContentBox();
-  const maxWidth = safeWidth;
-  const maxHeight = 900;
-  const fitted = fitQuote(ctx, quote, maxWidth, maxHeight);
-  const quoteBlockHeight = fitted.lines.length * fitted.lineHeight;
-  const authorGap = state.author.trim() ? 94 : 0;
-  const totalHeight = quoteBlockHeight + authorGap;
-  const startY = frame.height / 2 - totalHeight / 2 + fitted.lineHeight / 2 + 58;
+  const cleanQuote = state.quote.trim().replace(/^["“”]+|["“”]+$/g, '') || 'Escribe tu quote aquí.';
+  const padding = 58;
+  const fitted = fitQuote(ctx, cleanQuote, state.boxWidth - padding * 2, state.boxHeight - padding * 2);
+  ctx.font = `400 ${fitted.size}px ${quoteFont.value}`;
+  ctx.fillStyle = '#111111';
+  drawCenteredText(ctx, fitted.lines, state.boxX + state.boxWidth / 2,
+    state.boxY + state.boxHeight / 2 - (fitted.lines.length - 1) * fitted.lineHeight / 2, fitted.lineHeight);
 
-  ctx.font = `600 ${fitted.size}px ${quoteFont.value}`;
-  ctx.fillStyle = state.quoteColor;
-  drawCenteredText(ctx, fitted.lines, safeCenterX, startY, fitted.lineHeight);
-
-  if (state.author.trim()) {
-    ctx.font = `600 ${Math.max(32, Math.round(fitted.size * 0.48))}px ${quoteFont.value}`;
-    ctx.fillText(
-      `- ${state.author.trim()}`,
-      safeCenterX,
-      startY + quoteBlockHeight + authorGap,
-    );
-  }
+  const logoX = frame.width - TIKTOK_SAFE_ZONE.rightIconColumnWidth - TIKTOK_SAFE_ZONE.rightIconColumnMargin - 20;
+  const logoY = frame.height - TIKTOK_SAFE_ZONE.bottomCaptionHeight - 100;
+  ctx.font = logoFont.value;
+  ctx.textAlign = 'right';
+  const logoWidth = ctx.measureText(state.logoText).width + 108;
+  ctx.fillStyle = 'rgba(255,255,255,0.84)';
+  ctx.fillRect(logoX - logoWidth, logoY - 81, logoWidth, 162);
+  ctx.fillStyle = '#111111';
+  ctx.fillText(state.logoText, logoX - 54, logoY);
 }
 
 function canvasToBlob() {
@@ -364,7 +376,17 @@ onMounted(() => {
 
       <div class="phone-stage">
         <div class="canvas-frame">
-          <canvas ref="canvasRef" aria-label="Generated DiaUno quote frame"></canvas>
+          <canvas
+            ref="canvasRef"
+            aria-label="Generated DiaUno quote frame"
+            @pointerdown="onCanvasPointerDown"
+            @pointermove="onCanvasPointerMove"
+            @pointerup="onCanvasPointerUp"
+            @pointercancel="onCanvasPointerUp"
+          ></canvas>
+          <div class="box-resize-handle box-resize-handle--right" :style="{ left: `${(state.boxX + state.boxWidth - 6) / frame.width * 100}%`, top: `${(state.boxY + state.boxHeight / 2 - 18) / frame.height * 100}%` }" aria-hidden="true"></div>
+          <div class="box-resize-handle box-resize-handle--bottom" :style="{ left: `${(state.boxX + state.boxWidth / 2 - 18) / frame.width * 100}%`, top: `${(state.boxY + state.boxHeight - 6) / frame.height * 100}%` }" aria-hidden="true"></div>
+          <div class="box-resize-handle box-resize-handle--corner" :style="{ left: `${(state.boxX + state.boxWidth - 18) / frame.width * 100}%`, top: `${(state.boxY + state.boxHeight - 18) / frame.height * 100}%` }" aria-hidden="true"></div>
 
           <div v-if="state.showTiktokGuide" class="tiktok-guide" aria-hidden="true">
             <div class="tiktok-guide__safe-outline"></div>
@@ -413,6 +435,32 @@ onMounted(() => {
         <span>Quote</span>
         <textarea v-model="state.quote" rows="6" />
       </label>
+
+      <fieldset>
+        <legend>Quote background</legend>
+        <div class="segmented">
+          <label>
+            <input v-model="state.quoteAreaMode" type="radio" value="white" />
+            <span>White</span>
+          </label>
+          <label>
+            <input v-model="state.quoteAreaMode" type="radio" value="transparent" />
+            <span>Transparent</span>
+          </label>
+        </div>
+        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
+          <span>Brillo {{ state.quoteAreaBrightness }}%</span>
+          <input v-model.number="state.quoteAreaBrightness" min="25" max="175" step="5" type="range" />
+        </label>
+        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
+          <span>Opacidad {{ state.quoteAreaOpacity }}%</span>
+          <input v-model.number="state.quoteAreaOpacity" min="0" max="100" step="5" type="range" />
+        </label>
+        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
+          <span>Contraste {{ state.quoteAreaContrast }}%</span>
+          <input v-model.number="state.quoteAreaContrast" min="25" max="200" step="5" type="range" />
+        </label>
+      </fieldset>
 
       <label class="field">
         <span>Author</span>

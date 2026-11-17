@@ -95,8 +95,9 @@ h1 {
 .phone-stage {
   display: grid;
   place-items: center;
-  width: min(100%, 530px);
-  max-height: calc(100vh - 170px);
+  width: auto;
+  height: min(calc(100vh - 270px), 760px);
+  max-width: 100%;
   aspect-ratio: 9 / 16;
   padding: 10px;
   border-radius: 26px;
@@ -118,6 +119,34 @@ canvas {
   height: 100%;
   border-radius: 18px;
   background: #2979e1;
+  cursor: grab;
+  touch-action: none;
+}
+
+.box-resize-handle {
+  position: absolute;
+  z-index: 2;
+  border: 2px solid #111111;
+  background: #ffffff;
+  pointer-events: none;
+}
+
+.box-resize-handle--right {
+  width: 12px;
+  height: 36px;
+  cursor: ew-resize;
+}
+
+.box-resize-handle--bottom {
+  width: 36px;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.box-resize-handle--corner {
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
 }
 
 .tiktok-guide {
@@ -427,7 +456,9 @@ input[type="range"] {
   }
 
   .phone-stage {
-    max-height: 72vh;
+    width: auto;
+    height: min(72vh, 680px);
+    max-width: 100%;
   }
 }
 
