@@ -212,6 +212,24 @@ function drawCenteredText(ctx, lines, x, y, lineHeight) {
   });
 }
 
+function getCtaLines(ctx, text, maxWidth) {
+  const cleanText = text.trim();
+  if (!cleanText) return [];
+
+  const fontSize = 50;
+  ctx.font = `600 ${fontSize}px ${quoteFont.value}`;
+  return wrapText(ctx, cleanText, maxWidth).slice(0, 2);
+}
+
+function drawCta(ctx, lines, x, y) {
+  if (!lines.length) return 0;
+
+  const lineHeight = 64;
+  ctx.font = `600 50px ${quoteFont.value}`;
+  drawCenteredText(ctx, lines, x, y, lineHeight);
+  return lines.length * lineHeight;
+}
+
 function drawBoldScriptLogo(ctx, text, x, y) {
   [[0, 0], [-1.8, 0], [1.8, 0], [0, -1.2], [0, 1.2]].forEach(([dx, dy]) => {
     ctx.fillText(text, x + dx, y + dy);
@@ -465,6 +483,15 @@ onMounted(() => {
       <label class="field">
         <span>Author</span>
         <input v-model="state.author" type="text" placeholder="Optional" />
+      </label>
+
+      <label class="field">
+        <span>CTA</span>
+        <input
+          v-model="state.cta"
+          type="text"
+          placeholder="Comparte esto con alguien que necesita escucharlo."
+        />
       </label>
 
       <label class="field">
