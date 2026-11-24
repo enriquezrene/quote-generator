@@ -1,7 +1,6 @@
 import { createApp } from 'vue';
-import '@fontsource/alex-brush';
-import '@fontsource/allura';
-import '@fontsource/great-vibes';
+import '@fontsource/pacifico';
+import '@fontsource-variable/jetbrains-mono';
 import './styles.css';
 import App from './App.vue';
 

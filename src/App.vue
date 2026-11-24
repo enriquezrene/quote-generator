@@ -60,10 +60,11 @@ const state = reactive({
   quoteAreaContrast: 120,
   logoText: 'DiaUno',
   logoSize: 90,
+  logoColor: '#ffffff',
   fontSize: 76,
   autoFit: true,
   author: '',
-  backgroundMode: 'default',
+  backgroundMode: 'black',
   solidColor: '#2979E1',
   gradientStart: '#2979E1',
   gradientEnd: '#123D86',
@@ -73,10 +74,10 @@ const state = reactive({
 });
 
 const quoteFont = computed(() => {
-  return 'Inter, Montserrat, "Avenir Next", Futura, "Century Gothic", Arial, sans-serif';
+  return '"JetBrains Mono Variable", "JetBrains Mono", monospace';
 });
 
-const logoFont = computed(() => `500 ${state.logoSize}px Arial, sans-serif`);
+const logoFont = computed(() => `400 ${state.logoSize}px Pacifico, cursive`);
 
 function choosePhoto() {
   fileInputRef.value?.click();
@@ -92,6 +93,7 @@ function onPhotoSelected(event) {
     image.addEventListener('load', () => {
       state.photo = image;
       previewUrl.value = reader.result;
+      state.backgroundMode = 'photo';
       state.panX = 0;
       state.panY = 0;
       state.zoom = 1;
@@ -105,12 +107,13 @@ function onPhotoSelected(event) {
 function clearPhoto() {
   state.photo = null;
   previewUrl.value = '';
+  state.backgroundMode = 'black';
   if (fileInputRef.value) fileInputRef.value.value = '';
   renderFrame();
 }
 
 function drawBackground(ctx) {
-  ctx.fillStyle = '#222222';
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, frame.width, frame.height);
   if (!state.photo) return;
   const scale = Math.max(frame.width / state.photo.width, frame.height / state.photo.height) * state.zoom;
@@ -298,10 +301,7 @@ function renderFrame() {
   const logoY = frame.height - TIKTOK_SAFE_ZONE.bottomCaptionHeight - 100;
   ctx.font = logoFont.value;
   ctx.textAlign = 'right';
-  const logoWidth = ctx.measureText(state.logoText).width + 108;
-  ctx.fillStyle = 'rgba(255,255,255,0.84)';
-  ctx.fillRect(logoX - logoWidth, logoY - 81, logoWidth, 162);
-  ctx.fillStyle = '#111111';
+  ctx.fillStyle = state.logoColor;
   ctx.fillText(state.logoText, logoX - 54, logoY);
 }
 
@@ -455,8 +455,22 @@ onMounted(() => {
       </label>
 
       <fieldset>
+        <legend>Logo color</legend>
+        <div class="segmented segmented--pair">
+          <label>
+            <input v-model="state.logoColor" type="radio" value="#ffffff" />
+            <span>White</span>
+          </label>
+          <label>
+            <input v-model="state.logoColor" type="radio" value="#111111" />
+            <span>Black</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
         <legend>Quote background</legend>
-        <div class="segmented">
+        <div class="segmented segmented--pair">
           <label>
             <input v-model="state.quoteAreaMode" type="radio" value="white" />
             <span>White</span>
@@ -480,72 +494,16 @@ onMounted(() => {
         </label>
       </fieldset>
 
-      <label class="field">
-        <span>Author</span>
-        <input v-model="state.author" type="text" placeholder="Optional" />
-      </label>
-
-      <label class="field">
-        <span>CTA</span>
-        <input
-          v-model="state.cta"
-          type="text"
-          placeholder="Comparte esto con alguien que necesita escucharlo."
-        />
-      </label>
-
-      <label class="field">
-        <span>Preset</span>
-        <select v-model="state.selectedPreset" @change="applyPreset(state.selectedPreset)">
-          <option v-for="preset in presets" :key="preset.id" :value="preset.id">
-            {{ preset.label }}
-          </option>
-        </select>
-      </label>
-
       <fieldset>
         <legend>Background</legend>
-        <div class="segmented">
+        <div class="segmented segmented--pair">
           <label>
-            <input v-model="state.backgroundMode" type="radio" value="default" />
-            <span>Default</span>
-          </label>
-          <label>
-            <input v-model="state.backgroundMode" type="radio" value="solid" />
-            <span>Solid</span>
-          </label>
-          <label>
-            <input v-model="state.backgroundMode" type="radio" value="gradient" />
-            <span>Gradient</span>
+            <input v-model="state.backgroundMode" type="radio" value="black" />
+            <span>Black</span>
           </label>
           <label>
             <input v-model="state.backgroundMode" type="radio" value="photo" />
             <span>Photo</span>
-          </label>
-        </div>
-
-        <div v-if="state.backgroundMode === 'solid'" class="swatch-grid">
-          <button
-            v-for="color in colorChoices"
-            :key="color.value"
-            type="button"
-            class="swatch"
-            :class="{ selected: state.solidColor === color.value }"
-            :style="{ backgroundColor: color.value }"
-            :aria-label="`Set background ${color.label}`"
-            @click="state.solidColor = color.value"
-          />
-          <input v-model="state.solidColor" type="color" aria-label="Custom background color" />
-        </div>
-
-        <div v-if="state.backgroundMode === 'gradient'" class="color-pair">
-          <label>
-            <span>Start</span>
-            <input v-model="state.gradientStart" type="color" />
-          </label>
-          <label>
-            <span>End</span>
-            <input v-model="state.gradientEnd" type="color" />
           </label>
         </div>
 
@@ -568,23 +526,6 @@ onMounted(() => {
           >
             Remove
           </button>
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Quote Color</legend>
-        <div class="swatch-grid">
-          <button
-            v-for="color in colorChoices"
-            :key="color.value"
-            type="button"
-            class="swatch"
-            :class="{ selected: state.quoteColor === color.value }"
-            :style="{ backgroundColor: color.value }"
-            :aria-label="`Set quote ${color.label}`"
-            @click="state.quoteColor = color.value"
-          />
-          <input v-model="state.quoteColor" type="color" aria-label="Custom quote color" />
         </div>
       </fieldset>
 
