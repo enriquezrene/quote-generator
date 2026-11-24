@@ -18,30 +18,6 @@ const TIKTOK_SAFE_ZONE = {
   bottomCaptionHeight: 320,
 };
 
-const colorChoices = [
-  { label: 'White', value: '#ffffff' },
-  { label: 'Black', value: '#111111' },
-  { label: 'Red', value: '#ef4444' },
-  { label: 'Blue', value: '#2979E1' },
-  { label: 'Yellow', value: '#fde047' },
-  { label: 'Green', value: '#22c55e' },
-];
-
-const presets = [
-  {
-    id: 'default-blue',
-    label: 'Default Blue',
-    settings: {
-      backgroundMode: 'default',
-      quoteColor: '#ffffff',
-      solidColor: '#2979E1',
-      gradientStart: '#2979E1',
-      gradientEnd: '#123D86',
-      fontSize: 76,
-    },
-  },
-];
-
 const state = reactive({
   quote: '',
   photo: null,
@@ -112,17 +88,59 @@ function clearPhoto() {
   renderFrame();
 }
 
+function getPhotoPlacement() {
+  const scale = Math.max(frame.width / state.photo.width, frame.height / state.photo.height) * state.zoom;
+  const width = state.photo.width * scale;
+  const height = state.photo.height * scale;
+  return {
+    x: (frame.width - width) / 2 + state.panX,
+    y: (frame.height - height) / 2 + state.panY,
+    width,
+    height,
+  };
+}
+
+function createProcessedPhotoSurface(brightness, contrast, region = { x: 0, y: 0, width: frame.width, height: frame.height }) {
+  const surface = document.createElement('canvas');
+  surface.width = Math.max(1, Math.ceil(region.width));
+  surface.height = Math.max(1, Math.ceil(region.height));
+  const surfaceCtx = surface.getContext('2d', { willReadFrequently: true });
+  const placement = getPhotoPlacement();
+  surfaceCtx.drawImage(
+    state.photo,
+    placement.x - region.x,
+    placement.y - region.y,
+    placement.width,
+    placement.height,
+  );
+
+  // Process RGB values directly instead of relying on CanvasRenderingContext2D.filter,
+  // which is inconsistently applied to drawImage on some mobile browsers.
+  const pixels = surfaceCtx.getImageData(0, 0, surface.width, surface.height);
+  const data = pixels.data;
+  const contrastFactor = contrast / 100;
+  const brightnessFactor = brightness / 100;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const luminance =
+      (0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2]) * brightnessFactor;
+    const gray = Math.max(0, Math.min(255, (luminance - 128) * contrastFactor + 128));
+    data[index] = gray;
+    data[index + 1] = gray;
+    data[index + 2] = gray;
+  }
+
+  surfaceCtx.putImageData(pixels, 0, 0);
+  return surface;
+}
+
 function drawBackground(ctx) {
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, frame.width, frame.height);
   if (!state.photo) return;
-  const scale = Math.max(frame.width / state.photo.width, frame.height / state.photo.height) * state.zoom;
-  const width = state.photo.width * scale;
-  const height = state.photo.height * scale;
-  ctx.save();
-  ctx.filter = `grayscale(1) brightness(${state.brightness}%) contrast(${state.contrast}%)`;
-  ctx.drawImage(state.photo, (frame.width - width) / 2 + state.panX, (frame.height - height) / 2 + state.panY, width, height);
-  ctx.restore();
+
+  const photoSurface = createProcessedPhotoSurface(state.brightness, state.contrast);
+  ctx.drawImage(photoSurface, 0, 0, frame.width, frame.height);
 }
 
 const drag = { mode: null, startX: 0, startY: 0, originX: 0, originY: 0, originWidth: 0, originHeight: 0 };
@@ -263,16 +281,12 @@ function renderFrame() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
   } else if (state.photo) {
-    const scale = Math.max(frame.width / state.photo.width, frame.height / state.photo.height) * state.zoom;
-    const width = state.photo.width * scale;
-    const height = state.photo.height * scale;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
-    ctx.clip();
-    ctx.filter = `grayscale(1) brightness(${state.quoteAreaBrightness}%) contrast(${state.quoteAreaContrast}%)`;
-    ctx.drawImage(state.photo, (frame.width - width) / 2 + state.panX, (frame.height - height) / 2 + state.panY, width, height);
-    ctx.restore();
+    const quotePhoto = createProcessedPhotoSurface(
+      state.quoteAreaBrightness,
+      state.quoteAreaContrast,
+      { x: state.boxX, y: state.boxY, width: state.boxWidth, height: state.boxHeight },
+    );
+    ctx.drawImage(quotePhoto, state.boxX, state.boxY, state.boxWidth, state.boxHeight);
     if (state.quoteAreaOpacity > 0) {
       ctx.fillStyle = `rgba(255,255,255,${state.quoteAreaOpacity / 100})`;
       ctx.fillRect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
@@ -449,51 +463,6 @@ onMounted(() => {
     </section>
 
     <aside class="controls-panel" aria-label="Quote frame controls">
-      <label class="field">
-        <span>Quote</span>
-        <textarea v-model="state.quote" rows="6" />
-      </label>
-
-      <fieldset>
-        <legend>Logo color</legend>
-        <div class="segmented segmented--pair">
-          <label>
-            <input v-model="state.logoColor" type="radio" value="#ffffff" />
-            <span>White</span>
-          </label>
-          <label>
-            <input v-model="state.logoColor" type="radio" value="#111111" />
-            <span>Black</span>
-          </label>
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Quote background</legend>
-        <div class="segmented segmented--pair">
-          <label>
-            <input v-model="state.quoteAreaMode" type="radio" value="white" />
-            <span>White</span>
-          </label>
-          <label>
-            <input v-model="state.quoteAreaMode" type="radio" value="transparent" />
-            <span>Transparent</span>
-          </label>
-        </div>
-        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
-          <span>Brillo {{ state.quoteAreaBrightness }}%</span>
-          <input v-model.number="state.quoteAreaBrightness" min="25" max="175" step="5" type="range" />
-        </label>
-        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
-          <span>Opacidad {{ state.quoteAreaOpacity }}%</span>
-          <input v-model.number="state.quoteAreaOpacity" min="0" max="100" step="5" type="range" />
-        </label>
-        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
-          <span>Contraste {{ state.quoteAreaContrast }}%</span>
-          <input v-model.number="state.quoteAreaContrast" min="25" max="200" step="5" type="range" />
-        </label>
-      </fieldset>
-
       <fieldset>
         <legend>Background</legend>
         <div class="segmented segmented--pair">
@@ -529,6 +498,37 @@ onMounted(() => {
         </div>
       </fieldset>
 
+      <label class="field">
+        <span>Quote</span>
+        <textarea v-model="state.quote" rows="6" />
+      </label>
+
+      <fieldset>
+        <legend>Quote background</legend>
+        <div class="segmented segmented--pair">
+          <label>
+            <input v-model="state.quoteAreaMode" type="radio" value="white" />
+            <span>White</span>
+          </label>
+          <label>
+            <input v-model="state.quoteAreaMode" type="radio" value="transparent" />
+            <span>Transparent</span>
+          </label>
+        </div>
+        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
+          <span>Brillo {{ state.quoteAreaBrightness }}%</span>
+          <input v-model.number="state.quoteAreaBrightness" min="25" max="175" step="5" type="range" />
+        </label>
+        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
+          <span>Opacidad {{ state.quoteAreaOpacity }}%</span>
+          <input v-model.number="state.quoteAreaOpacity" min="0" max="100" step="5" type="range" />
+        </label>
+        <label v-if="state.quoteAreaMode === 'transparent'" class="range-field">
+          <span>Contraste {{ state.quoteAreaContrast }}%</span>
+          <input v-model.number="state.quoteAreaContrast" min="25" max="200" step="5" type="range" />
+        </label>
+      </fieldset>
+
       <fieldset>
         <legend>Type Size</legend>
         <label class="toggle-row">
@@ -547,6 +547,20 @@ onMounted(() => {
           <input v-model="state.showTiktokGuide" type="checkbox" />
           <span>Show TikTok UI guide</span>
         </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Logo color</legend>
+        <div class="segmented segmented--pair">
+          <label>
+            <input v-model="state.logoColor" type="radio" value="#ffffff" />
+            <span>White</span>
+          </label>
+          <label>
+            <input v-model="state.logoColor" type="radio" value="#111111" />
+            <span>Black</span>
+          </label>
+        </div>
       </fieldset>
     </aside>
   </main>
