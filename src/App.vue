@@ -296,10 +296,6 @@ function renderFrame() {
     ctx.fillStyle = `rgb(${level}, ${level}, ${level})`;
     ctx.fillRect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
   }
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(state.boxX, state.boxY, state.boxWidth, state.boxHeight);
-
   const quote = state.quote.trim()
     ? `"${state.quote.trim().replace(/^["“”]+|["“”]+$/g, '')}"`
     : '"Your quote goes here."';
